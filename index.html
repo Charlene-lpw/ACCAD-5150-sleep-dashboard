@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sleep Quality Dashboard</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;800&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #f4f7f9; 
+            margin: 0; 
+            padding: 10px; 
+            color: #2d3436; 
+            height: 100vh; 
+            width: 100vw; 
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header { height: 50px; text-align: center; margin-bottom: 5px; flex-shrink: 0; }
+        .header h1 { 
+            margin: 0; 
+            font-size: 1.8rem; 
+            font-family: 'Montserrat', sans-serif; 
+            font-weight: 800; 
+            letter-spacing: -0.5px;
+        }
+        
+        .poster-container {
+            display: grid;
+            grid-template-columns: 1.2fr 2fr; 
+            gap: 10px;
+            flex: 1; 
+            min-height: 0; 
+            width: 100%;
+            align-items: stretch;
+        }
+
+        .hero-card {
+            background: #2d3436;
+            border-radius: 12px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            color: white;
+            min-height: 0;
+            height: 100%; 
+        }
+
+        #sleep-clocks { 
+            display: flex; 
+            flex-direction: row; 
+            justify-content: space-around; 
+            align-items: center;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            margin-bottom: 5px;
+            height: 140px; 
+            flex-shrink: 0;
+        }
+        #sleep-window { flex: 1; min-height: 0; width: 100%; }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(12, 1fr); 
+            gap: 10px;
+            min-height: 0;
+            height: 100%;
+        }
+
+        .wide-chart-top { grid-column: 1 / 3; grid-row: span 3; }
+        .wide-chart-bottom { grid-column: 1 / 3; grid-row: 4 / 7; } 
+        .mid-height-card { grid-row: span 3; }
+
+        .chart-card {
+            background: white;
+            border-radius: 10px;
+            padding: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        h3 { 
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 14px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 5px 0; 
+            color: #636e72; 
+            border-bottom: 1px solid #eee; 
+            padding-bottom: 2px; 
+        }
+        .dark-card h3 { color: #dfe6e9; border-color: #444; }
+        .viz-container { flex: 1; min-height: 0; width: 100%; height: 100%; }
+        
+        .clock-item { text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .clock-label { font-size: 10px; color: #b2bec3; margin-top: 5px; font-weight: 500; }
+        .clock-val { font-size: 18px; font-weight: 800; color: white; margin-top: 2px; }
+        .axis text { font-size: 8px; fill: #636e72; }
+        .dark-axis text { fill: #b2bec3; font-size: 9px; }
+        .dark-axis path, .dark-axis line { stroke: #444; }
+        .legend-container { display: flex; justify-content: center; gap: 15px; margin-bottom: 5px; font-size: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .legend-box { width: 12px; height: 12px; border-radius: 2px; }
+        .slider-box { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; padding: 0 5px; }
+        .slider-box label { font-size: 9px; color: #636e72; font-weight: bold; white-space: nowrap; }
+        input[type=range] { cursor: pointer; height: 4px; flex: 1; margin: 0; }
+
+        /* Author Style */
+        .footer-author {
+            text-align: right;
+            font-size: 11px;
+            color: #9aa2a9;
+            padding-top: 5px;
+            font-weight: 500;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header"><h1>Determinants of Sleep Quality</h1></div>
+    <div class="poster-container">
+        <div class="hero-card dark-card">
+            <h3>Sleep Overview</h3>
+            <div id="sleep-clocks"></div>
+            <div class="legend-container">
+                <div class="legend-item"><div class="legend-box" style="background: #55efc4;"></div><span>Top Performers (8-10)</span></div>
+                <div class="legend-item"><div class="legend-box" style="background: #ff7675;"></div><span>Struggling Group (1-4)</span></div>
+            </div>
+            <div id="sleep-window" class="viz-container"></div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card wide-chart-top">
+                <h3>Sleep Quality Age Trend</h3>
+                <div class="slider-box">
+                    <label>Age Range: 18 — <span id="age-val">60</span></label>
+                    <input type="range" id="age-slider" min="18" max="60" value="60">
+                </div>
+                <div id="age-analysis" class="viz-container"></div>
+            </div>
+            
+            <div class="chart-card wide-chart-bottom">
+                <h3>Sleep Quality Distribution: Male vs Female</h3>
+                <div id="butterfly-analysis" class="viz-container"></div>
+            </div>
+
+            <div class="chart-card mid-height-card"><h3>Diet Quality vs Sleep Quality</h3><div id="diet-bar" class="viz-container"></div></div>
+            <div class="chart-card mid-height-card"><h3>Physical Activity Level vs Sleep Quality</h3><div id="activity-h-bar" class="viz-container"></div></div>
+            <div class="chart-card mid-height-card"><h3>Medication Usage vs Sleep Quality</h3><div id="med-bar" class="viz-container"></div></div>
+            <div class="chart-card mid-height-card"><h3>Sleep Disorder vs Sleep Quality</h3><div id="disorder-bar" class="viz-container"></div></div>
+        </div>
+    </div>
+    
+    <div class="footer-author">Author: Chalene Li</div>
+
+    <script>
+        const margin = {top: 5, right: 15, bottom: 20, left: 10}; 
+        let dataGlobal = [];
+        let agePath, ageLine, ageX, ageY;
+
+        d3.csv("Sleep_Quality_Dataset.csv").then(data => {
+            data.forEach(d => {
+                d.Steps = +d["Daily Steps"];
+                d.Quality = +d["Sleep Quality"];
+                d.Hours = +d["Sleep Hour"];
+                d.Age = +d["Age"];
+                d.ID = d["User ID"];
+                d.Gender = d.Gender ? d.Gender.toLowerCase().trim() : 'm';
+            });
+            dataGlobal = data;
+            const observer = new ResizeObserver(() => { if (dataGlobal.length > 0) drawAll(); });
+            observer.observe(document.querySelector('.poster-container'));
+            d3.select("#age-slider").on("input", function() {
+                d3.select("#age-val").text(this.value);
+                updateAgePlot(+this.value);
+            });
+        });
+
+        function drawAll() {
+            if (document.querySelector('.poster-container').clientWidth <= 0) return;
+            d3.selectAll("svg").remove();
+            d3.select("#sleep-clocks").selectAll("*").remove();
+
+            drawSleepClocks(); drawSleepWindow(); drawDietBar();
+            drawHorizontalBar(); drawMedicationBar(); drawDisorderBar(); 
+            initAgePlot(); drawButterflyChart();
+        }
+        
+        const activityColors = {
+            "low": "#D5E9CE",
+            "medium": "#83BE6F",
+            "high": "#559041"
+        };
+
+        function drawHorizontalBar() {
+            const el = document.querySelector("#activity-h-bar");
+            const am = {top: 10, right: 30, bottom: 25, left: 45};
+            const w = el.clientWidth - am.left - am.right, h = el.clientHeight - am.top - am.bottom;
+            const svg = d3.select("#activity-h-bar").append("svg").attr("width", el.clientWidth).attr("height", el.clientHeight).append("g").attr("transform", `translate(${am.left},${am.top})`);
+            const rolled = d3.rollups(dataGlobal, v => d3.mean(v, d => d.Quality), d => d["Physical Activity Level"]);
+            const activityOrder = ["low", "medium", "high"];
+            rolled.sort((a, b) => activityOrder.indexOf(a[0]) - activityOrder.indexOf(b[0]));
+            const y = d3.scaleBand().domain(activityOrder).range([0, h]).padding(0.3);
+            const x = d3.scaleLinear().domain([0, 10]).range([0, w]);
+            svg.append("g").attr("class", "axis").call(d3.axisLeft(y).tickSize(0));
+            svg.append("g").attr("class", "axis").attr("transform", `translate(0,${h})`).call(d3.axisBottom(x).ticks(5));
+            svg.selectAll("rect")
+                .data(rolled)
+                .enter()
+                .append("rect")
+                .attr("y", d => y(d[0]))
+                .attr("width", d => x(d[1]))
+                .attr("height", y.bandwidth())
+                .attr("fill", d => activityColors[d[0]]);
+            svg.selectAll(".act-label").data(rolled).enter().append("text")
+                .attr("x", d => x(d[1]) + 3).attr("y", d => y(d[0]) + y.bandwidth()/2 + 3)
+                .attr("font-size", "8px").attr("font-weight", "bold").text(d => d[1].toFixed(1));
+        }
+
+        function drawMedicationBar() {
+            const el = document.querySelector("#med-bar");
+            const mm = {top: 10, right: 10, bottom: 25, left: 35};
+            const w = el.clientWidth - mm.left - mm.right, h = el.clientHeight - mm.top - mm.bottom;
+            const svg = d3.select("#med-bar").append("svg").attr("width", el.clientWidth).attr("height", el.clientHeight).append("g").attr("transform", `translate(${mm.left},${mm.top})`);
+            const getMedColor = (label) => {
+                const clean = label.toString().toLowerCase().trim();
+                if (clean === "no" || clean === "none") return "#D5E9CE";
+                if (clean === "yes") return "#559041";
+                return "#81ecec";
+            };
+            const rolled = d3.rollups(dataGlobal, v => d3.mean(v, d => d.Quality), d => d["Medication Usage"]).sort((a,b) => a[0].toString().localeCompare(b[0].toString()));
+            const x = d3.scaleBand().domain(rolled.map(d => d[0])).range([0, w]).padding(0.4);
+            const y = d3.scaleLinear().domain([0, 10]).range([h, 0]);
+            svg.append("g").attr("class", "axis").attr("transform", `translate(0,${h})`).call(d3.axisBottom(x));
+            svg.append("g").attr("class", "axis").call(d3.axisLeft(y).ticks(5));
+            svg.selectAll("rect").data(rolled).enter().append("rect").attr("x", d => x(d[0])).attr("y", d => y(d[1])).attr("width", x.bandwidth()).attr("height", d => h - y(d[1])).attr("fill", d => getMedColor(d[0]));
+            svg.selectAll(".bar-label").data(rolled).enter().append("text").attr("x", d => x(d[0]) + x.bandwidth()/2).attr("y", d => y(d[1]) - 3).attr("text-anchor", "middle").attr("font-size", "8px").attr("font-weight", "bold").text(d => d[1].toFixed(1));
+        }
+
+        function drawDisorderBar() {
+            const el = document.querySelector("#disorder-bar");
+            const dm = {top: 10, right: 10, bottom: 25, left: 35};
+            const w = el.clientWidth - dm.left - dm.right, h = el.clientHeight - dm.top - dm.bottom;
+            const svg = d3.select("#disorder-bar").append("svg").attr("width", el.clientWidth).attr("height", el.clientHeight).append("g").attr("transform", `translate(${dm.left},${dm.top})`);
+            const disKey = Object.keys(dataGlobal[0]).find(k => k.toLowerCase().includes('disorder')) || "Sleep Disorder";
+            const mapped = dataGlobal.map(d => {
+                const raw = d[disKey] ? d[disKey].toString().toLowerCase().trim() : "";
+                return { status: (raw === "none" || raw === "" || raw === "no") ? "No" : "Yes", Quality: d.Quality };
+            });
+            const rolled = d3.rollups(mapped, v => d3.mean(v, d => d.Quality), d => d.status).sort((a,b) => a[0].localeCompare(b[0]));
+            const x = d3.scaleBand().domain(["No", "Yes"]).range([0, w]).padding(0.4);
+            const y = d3.scaleLinear().domain([0, 10]).range([h, 0]);
+            svg.append("g").attr("class", "axis").attr("transform", `translate(0,${h})`).call(d3.axisBottom(x));
+            svg.append("g").attr("class", "axis").call(d3.axisLeft(y).ticks(5));
+            svg.selectAll("rect").data(rolled).enter().append("rect").attr("x", d => x(d[0])).attr("y", d => y(d[1])).attr("width", x.bandwidth()).attr("height", d => h - y(d[1])).attr("fill", d => d[0] === "No" ? "#D5E9CE" : "#559041");
+            svg.selectAll(".bar-label").data(rolled).enter().append("text").attr("x", d => x(d[0]) + x.bandwidth()/2).attr("y", d => y(d[1]) - 3).attr("text-anchor", "middle").attr("font-size", "8px").attr("font-weight", "bold").text(d => d[1].toFixed(1));
+        }
+
+        function initAgePlot() {
+            const el = document.querySelector("#age-analysis");
+            const am = {top: 10, right: 25, bottom: 25, left: 35};
+            const w = el.clientWidth - am.left - am.right, h = el.clientHeight - am.top - am.bottom;
+            const ageSvg = d3.select("#age-analysis").append("svg").attr("width", el.clientWidth).attr("height", el.clientHeight).append("g").attr("transform", `translate(${am.left},${am.top})`);
+            ageX = d3.scaleLinear().domain([18, 60]).range([0, w]);
+            ageY = d3.scaleLinear().domain([0, 10]).range([h, 0]);
+            ageSvg.append("g").attr("class", "axis").attr("transform", `translate(0,${h})`).call(d3.axisBottom(ageX).ticks(10));
+            ageSvg.append("g").attr("class", "axis").call(d3.axisLeft(ageY).ticks(5));
+            ageLine = d3.line().x(d => ageX(d[0])).y(d => ageY(d[1])).curve(d3.curveMonotoneX);
+            agePath = ageSvg.append("path").attr("fill", "none").attr("stroke", "#6c5ce7").attr("stroke-width", 2.5);
+            updateAgePlot(d3.select("#age-slider").property("value"));
+        }
+
+        function updateAgePlot(limit) {
+            const filtered = dataGlobal.filter(d => d.Age <= limit);
+            const rolled = d3.rollups(filtered, v => d3.mean(v, d => d.Quality), d => d.Age).sort((a,b) => a[0] - b[0]);
+            agePath.datum(rolled).transition().duration(400).attr("d", ageLine);
+        }
+
+        function drawSleepClocks() {
+            const container = d3.select("#sleep-clocks");
+            const configs = [
+                { label: "Male Avg", val: d3.mean(dataGlobal.filter(d => d.Gender === 'm' || d.Gender === 'male'), d => d.Hours) || 0, col: "#a29bfe" },
+                { label: "Female Avg", val: d3.mean(dataGlobal.filter(d => d.Gender === 'f' || d.Gender === 'female'), d => d.Hours) || 0, col: "#fab1a0" },
+                { label: "Recommended", val: 8, col: "#81ecec" }
+            ];
+            configs.forEach(cfg => {
+                const item = container.append("div").attr("class", "clock-item");
+                const size = 95; const radius = size/2;
+                const svg = item.append("svg").attr("width", size).attr("height", size);
+                const g = svg.append("g").attr("transform", `translate(${radius},${radius})`);
+                g.append("circle").attr("r", radius-3).attr("fill", "#444");
+                const arc = d3.arc().innerRadius(0).outerRadius(radius-3).startAngle(0).endAngle((cfg.val/12)*2*Math.PI);
+                g.append("path").attr("d", arc).attr("fill", cfg.col);
+                const markerRadius = radius - 8;
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * 2 * Math.PI;
+                    const x = Math.sin(angle) * markerRadius;
+                    const y = -Math.cos(angle) * markerRadius;
+                    g.append("circle").attr("cx", x).attr("cy", y).attr("r", 1.5).attr("fill", "white").attr("opacity", 1);
+                }
+                item.append("div").attr("class", "clock-val").text(cfg.val.toFixed(1) + "h");
+                item.append("div").attr("class", "clock-label").text(cfg.label);
+            });
+        }
+
+        function drawSleepWindow() {
+            const el = document.querySelector("#sleep-window");
+            const w = el.clientWidth - 30, h = el.clientHeight - 40;
+            const svg = d3.select("#sleep-window").append("svg").attr("width", el.clientWidth).attr("height", el.clientHeight).append("g").attr("transform", `translate(15,10)`);
+            const parseTime = (str) => { if(!str) return 0; const [h, m] = str.split(':').map(Number); return h + (m/60); };
+            let vizData = dataGlobal.map(d => { const bed = parseTime(d.Bedtime); const wake = parseTime(d["Wake-up Time"]); return { id: d.ID, q: d.Quality, start: bed >= 18 ? bed - 18 : bed + 6, end: wake + 6 }; }).filter(d => d.q >= 8 || d.q <= 4).slice(0, 25);
+            const x = d3.scaleLinear().domain([0, 24]).range([0, w]);
+            const y = d3.scaleBand().domain(vizData.map(d => d.id)).range([0, h]).padding(0.5);
+            const tickValues = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+            const tickLabels = ["6PM", "9PM", "12AM", "3AM", "6AM", "9AM", "12PM", "3PM", "6PM"];
+            svg.append("g").attr("class", "dark-axis").attr("transform", `translate(0,${h})`).call(d3.axisBottom(x).tickValues(tickValues).tickFormat((d, i) => tickLabels[i]));
+            svg.selectAll(".sleep-rect").data(vizData).enter().append("rect").attr("x", d => x(d.start)).attr("y", d => y(d.id)).attr("width", d => Math.max(5, x(d.end) - x(d.start))).attr("height", y.bandwidth()).attr("rx", 4).attr("fill", d => d.q >= 8 ? "#55efc4" : "#ff7675");
+        }
+
+        function drawDietBar() {
+            const el = document.querySelector("#diet-bar");
+            const dm = {top: 10, right: 10, bottom: 25, left: 35};
+            const w = el.clientWidth - dm.left - dm.right, h = el.clientHeight - dm.top - dm.bottom;
+            const svg = d3.select("#diet-bar").append("svg").attr("width", el.clientWidth).attr("height", el.clientHeight).append("g").attr("transform", `translate(${dm.left},${dm.top})`);
+            const dietOrder = ["unhealthy", "medium", "healthy"];
+            const dietColors = { "unhealthy": "#D5E9CE", "medium": "#83BE6F", "healthy": "#559041" };
+            const rolled = d3.rollups(dataGlobal, v => d3.mean(v, d => d.Quality), d => d["Dietary Habits"]).sort((a,b) => dietOrder.indexOf(a[0]) - dietOrder.indexOf(b[0]));
+            const x = d3.scaleBand().domain(dietOrder).range([0, w]).padding(0.3);
+            const y = d3.scaleLinear().domain([0, 10]).range([h, 0]);
+            svg.append("g").attr("class", "axis").attr("transform", `translate(0,${h})`).call(d3.axisBottom(x));
+            svg.append("g").attr("class", "axis").call(d3.axisLeft(y).ticks(5));
+            svg.selectAll("rect").data(rolled).enter().append("rect").attr("x", d => x(d[0])).attr("y", d => y(d[1])).attr("width", x.bandwidth()).attr("height", d => h - y(d[1])).attr("fill", d => dietColors[d[0]]);
+            svg.selectAll(".bl").data(rolled).enter().append("text").attr("x", d => x(d[0])+x.bandwidth()/2).attr("y", d => y(d[1])-3).attr("text-anchor", "middle").attr("font-size", "8px").attr("font-weight", "bold").text(d => d[1].toFixed(1));
+        }
+
+        function drawButterflyChart() {
+            const el = document.querySelector("#butterfly-analysis");
+            const bm = {top: 20, right: 20, bottom: 25, left: 20};
+            const w = el.clientWidth - bm.left - bm.right, h = el.clientHeight - bm.top - bm.bottom;
+            const svg = d3.select("#butterfly-analysis").append("svg").attr("width", el.clientWidth).attr("height", el.clientHeight).append("g").attr("transform", `translate(${bm.left},${bm.top})`);
+            svg.append("text").attr("x", w * 0.25 - 10).attr("y", -8).attr("text-anchor", "middle").attr("font-size", "10px").attr("font-weight", "800").attr("fill", "#a29bfe").text("MALE");
+            svg.append("text").attr("x", w * 0.75 + 10).attr("y", -8).attr("text-anchor", "middle").attr("font-size", "10px").attr("font-weight", "800").attr("fill", "#fab1a0").text("FEMALE");
+            const maleData = d3.rollups(dataGlobal.filter(d => d.Gender.startsWith('m')), v => v.length, d => Math.round(d.Quality));
+            const femaleData = d3.rollups(dataGlobal.filter(d => d.Gender.startsWith('f')), v => v.length, d => Math.round(d.Quality));
+            const maxC = d3.max([...maleData, ...femaleData], d => d[1]) || 1;
+            const xM = d3.scaleLinear().domain([0, maxC]).range([w/2 - 20, 0]);
+            const xF = d3.scaleLinear().domain([0, maxC]).range([w/2 + 20, w]);
+            const y = d3.scaleBand().domain(d3.range(1, 11)).range([h, 0]).padding(0.2);
+            svg.selectAll(".bm").data(maleData).enter().append("rect").attr("x", d => xM(d[1])).attr("y", d => y(d[0])).attr("width", d => (w/2-20)-xM(d[1])).attr("height", y.bandwidth()).attr("fill", "#a29bfe");
+            svg.selectAll(".bf").data(femaleData).enter().append("rect").attr("x", w/2+20).attr("y", d => y(d[0])).attr("width", d => xF(d[1])-(w/2+20)).attr("height", y.bandwidth()).attr("fill", "#fab1a0");
+            svg.selectAll(".sl").data(d3.range(1, 11)).enter().append("text").attr("x", w/2).attr("y", d => y(d)+y.bandwidth()/2+4).attr("text-anchor", "middle").attr("font-size", "9px").attr("font-weight", "bold").text(d => d);
+            const avgM = d3.mean(dataGlobal.filter(d => d.Gender.startsWith('m')), d => d.Quality);
+            const avgF = d3.mean(dataGlobal.filter(d => d.Gender.startsWith('f')), d => d.Quality);
+            const yLin = d3.scaleLinear().domain([1, 10]).range([y(1) + y.bandwidth()/2, y(10) + y.bandwidth()/2]);
+            if (avgM) {
+                svg.append("line").attr("x1", 0).attr("x2", w/2-20).attr("y1", yLin(avgM)).attr("y2", yLin(avgM)).attr("stroke", "#2d3436").attr("stroke-width", 1).attr("stroke-dasharray", "2,2");
+                svg.append("text").attr("x", 2).attr("y", yLin(avgM)-3).attr("font-size", "7px").attr("font-weight", "bold").attr("fill", "#2d3436").text("Avg: " + avgM.toFixed(1));
+            }
+            if (avgF) {
+                svg.append("line").attr("x1", w/2+20).attr("x2", w).attr("y1", yLin(avgF)).attr("y2", yLin(avgF)).attr("stroke", "#2d3436").attr("stroke-width", 1).attr("stroke-dasharray", "2,2");
+                svg.append("text").attr("x", w-2).attr("y", yLin(avgF)-3).attr("text-anchor", "end").attr("font-size", "7px").attr("font-weight", "bold").attr("fill", "#2d3436").text("Avg: " + avgF.toFixed(1));
+            }
+        }
+    </script>
+</body>
+</html>
